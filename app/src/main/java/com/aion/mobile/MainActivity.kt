@@ -4,6 +4,10 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.View
+import android.view.WindowManager
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,6 +27,7 @@ import androidx.navigation.compose.rememberNavController
 import com.aion.mobile.data.prefs.AppPreferences
 import com.aion.mobile.navigation.Screen
 import com.aion.mobile.ui.screen.AddReminderScreen
+import com.aion.mobile.ui.screen.ConnectScreen
 import com.aion.mobile.ui.screen.AddServerScreen
 import com.aion.mobile.ui.screen.HomeScreen
 import com.aion.mobile.ui.screen.RemindersScreen
@@ -44,6 +49,9 @@ class MainActivity : ComponentActivity() {
         appPreferences = AppPreferences(this)
 
         requestNotificationPermission()
+
+        // Modo immersivo — ocultar barras de sistema (fullscreen de verdad)
+        enableImmersiveMode()
 
         setContent {
             val darkMode by appPreferences.darkMode.collectAsState(initial = false)
@@ -75,24 +83,30 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable(Screen.Home.route) {
-                            HomeScreen(
-                                serverUrl = activeServer?.url,
-                                serverName = activeServer?.name ?: "",
-                                onNavigateToServers = {
-                                    navController.navigate(Screen.Servers.route)
-                                },
-                                onNavigateToSettings = {
-                                    navController.navigate(Screen.Settings.route)
-                                },
-                                onNavigateToReminders = {
-                                    navController.navigate(Screen.Reminders.route)
-                                },
-                                onNavigateToSplash = {
-                                    navController.navigate(Screen.Splash.route) {
-                                        popUpTo(Screen.Home.route) { inclusive = true }
+                            val servers by appPreferences.servers.collectAsState(initial = emptyList())
+
+                            if (servers.isEmpty()) {
+                                ConnectScreen(
+                                    appPreferences = appPreferences,
+                                    onConnected = {
+                                        navController.navigate(Screen.Home.route) {
+                                            popUpTo(Screen.Home.route) { inclusive = true }
+                                        }
                                     }
-                                }
-                            )
+                                )
+                            } else {
+                                val activeServer = servers.find { it.id == activeServerId }
+                                    ?: servers.firstOrNull()
+
+                                HomeScreen(
+                                    serverUrl = activeServer?.url,
+                                    serverName = activeServer?.name ?: "",
+                                    appPreferences = appPreferences,
+                                    onNavigateToSplash = {
+                                        navController.navigate(Screen.AddServer.route)
+                                    }
+                                )
+                            }
                         }
 
                         composable(Screen.Servers.route) {
@@ -138,6 +152,39 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    private fun enableImmersiveMode() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Android 11+ — WindowInsetsController API
+            window.insetsController?.let { controller ->
+                controller.hide(WindowInsets.Type.systemBars())
+                controller.systemBarsBehavior =
+                    WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else {
+            // Android 10 y anteriores
+            window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                or View.SYSTEM_UI_FLAG_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+            )
+        }
+        // Extender dibujo detrás de las barras
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+        )
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            enableImmersiveMode()
         }
     }
 
