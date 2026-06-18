@@ -55,6 +55,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aion.mobile.data.model.ConnectionMode
 import com.aion.mobile.data.prefs.AppPreferences
 import com.aion.mobile.ui.component.WebViewComponent
 import kotlinx.coroutines.launch
@@ -188,6 +189,7 @@ fun HomeScreen(
                             SidebarItem(
                                 icon = Icons.Default.Dns,
                                 label = server.name,
+                                badge = if (server.connectionMode == ConnectionMode.TAILSCALE) "TS" else "LAN",
                                 isActive = server.url == currentUrl,
                                 onClick = {
                                     currentUrl = server.url
@@ -307,6 +309,7 @@ fun HomeScreen(
 private fun SidebarItem(
     icon: ImageVector,
     label: String,
+    badge: String? = null,
     isActive: Boolean,
     onClick: () -> Unit,
     onDelete: (() -> Unit)? = null
@@ -343,5 +346,14 @@ private fun SidebarItem(
                 MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
+        if (badge != null) {
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = badge,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }

@@ -1,5 +1,7 @@
 package com.aion.mobile.ui.screen
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,22 +12,31 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.NetworkCheck
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -40,10 +51,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.aion.mobile.data.model.ConnectionMode
 import com.aion.mobile.data.model.Server
 import com.aion.mobile.data.prefs.AppPreferences
 import com.aion.mobile.network.AionUIDiscovery
 import com.aion.mobile.network.DiscoveredServer
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.launch
 
 @Composable
@@ -60,13 +74,36 @@ fun ConnectScreen(
     var scanDone by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var showManualEntry by remember { mutableStateOf(false) }
+    var connectionMode by remember { mutableStateOf(ConnectionMode.LAN) }
+    var showTailscaleHelp by remember { mutableStateOf(false) }
+
+    val scannerLauncher = rememberLauncherForActivityResult(
+        ScanContract()
+    ) { result ->
+        if (result.contents != null) {
+            val scannedUrl = result.contents.trim()
+            if (scannedUrl.isNotBlank()) {
+                isConnecting = true
+                scope.launch {
+                    appPreferences.addServer(
+                        Server(
+                            name = "Mi PC (QR)",
+                            url = scannedUrl,
+                            connectionMode = connectionMode
+                        )
+                    )
+                    onConnected()
+                }
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .padding(24.dp)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
             imageVector = Icons.Default.Wifi,
@@ -88,10 +125,92 @@ fun ConnectScreen(
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Mode selector
+        Text(
+            text = "Modo de conexión",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            SegmentedButton(
+                selected = connectionMode == ConnectionMode.LAN,
+                onClick = { connectionMode = ConnectionMode.LAN },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+            ) {
+                Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("LAN")
+            }
+            SegmentedButton(
+                selected = connectionMode == ConnectionMode.TAILSCALE,
+                onClick = { connectionMode = ConnectionMode.TAILSCALE },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+            ) {
+                Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Tailscale")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        if (connectionMode == ConnectionMode.TAILSCALE) {
+            // Tailscale help section
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Ayuda Tailscale",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        IconButton(onClick = { showTailscaleHelp = !showTailscaleHelp }) {
+                            Icon(
+                                if (showTailscaleHelp) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = "Toggle"
+                            )
+                        }
+                    }
+                    AnimatedVisibility(visible = showTailscaleHelp) {
+                        Column {
+                            Text(
+                                text = "Cómo conectar con Tailscale:",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "1. Instala Tailscale en tu PC y en este dispositivo\n" +
+                                        "2. Inicia sesión con la misma cuenta en ambos\n" +
+                                        "3. Busca la IP de Tailscale de tu PC (100.x.x.x)\n" +
+                                        "   en la lista de máquinas de la app de Tailscale\n" +
+                                        "4. Asegúrate que el puerto 25808 esté abierto\n" +
+                                        "5. Ingresa la IP 100.x.x.x:25808 manualmente",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
         if (!scanDone && !showManualEntry) {
-            // Botón: Buscar automáticamente
+            // Search button
             Button(
                 onClick = {
                     isScanning = true
@@ -136,7 +255,29 @@ fun ConnectScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // QR scan button
+            FilledTonalButton(
+                onClick = {
+                    val options = ScanOptions()
+                    options.setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                    options.setPrompt("Escanea el código QR de AionUI")
+                    options.setBeepEnabled(false)
+                    options.setOrientationLocked(false)
+                    scannerLauncher.launch(options)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Escanear QR", style = MaterialTheme.typography.titleMedium)
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             TextButton(onClick = { showManualEntry = true }) {
                 Text("O ingresar IP manualmente")
@@ -159,7 +300,8 @@ fun ConnectScreen(
                             scope.launch {
                                 val newServer = Server(
                                     name = "Mi PC",
-                                    url = "http://${server.ip}:${server.port}"
+                                    url = "http://${server.ip}:${server.port}",
+                                    connectionMode = connectionMode
                                 )
                                 appPreferences.addServer(newServer)
                                 appPreferences.setActiveServer(newServer.id)
@@ -253,7 +395,11 @@ fun ConnectScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "En tu PC abre una terminal y escribe: ipconfig\nBusca la IPv4 en tu conexión WiFi",
+                text = if (connectionMode == ConnectionMode.TAILSCALE) {
+                    "Encuentra la IP de Tailscale de tu PC (100.x.x.x)"
+                } else {
+                    "En tu PC abre una terminal y escribe: ipconfig\nBusca la IPv4 en tu conexión WiFi"
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -264,7 +410,11 @@ fun ConnectScreen(
                 value = ipAddress,
                 onValueChange = { ipAddress = it },
                 label = { Text("IP del PC") },
-                placeholder = { Text("192.168.1.100") },
+                placeholder = {
+                    Text(
+                        if (connectionMode == ConnectionMode.TAILSCALE) "100.x.x.x" else "192.168.1.100"
+                    )
+                },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = {
@@ -297,8 +447,9 @@ fun ConnectScreen(
                         if (works) {
                             appPreferences.addServer(
                                 Server(
-                                    name = "Mi PC",
-                                    url = url
+                                    name = if (connectionMode == ConnectionMode.TAILSCALE) "Mi PC (Tailscale)" else "Mi PC",
+                                    url = url,
+                                    connectionMode = connectionMode
                                 )
                             )
                             onConnected()

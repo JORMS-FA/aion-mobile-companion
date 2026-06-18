@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.aion.mobile.data.model.ConnectionMode
 import com.aion.mobile.data.model.Server
 import com.aion.mobile.notification.Reminder
 import kotlinx.coroutines.flow.Flow
@@ -25,7 +26,7 @@ class AppPreferences(private val context: Context) {
     }
 
     val darkMode: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[DARK_MODE] ?: false
+        prefs[DARK_MODE] ?: true
     }
 
     val servers: Flow<List<Server>> = context.dataStore.data.map { prefs ->
@@ -126,7 +127,10 @@ class AppPreferences(private val context: Context) {
                 id = obj.getString("id"),
                 name = obj.getString("name"),
                 url = obj.getString("url"),
-                isActive = obj.optBoolean("isActive", false)
+                isActive = obj.optBoolean("isActive", false),
+                connectionMode = try {
+                    ConnectionMode.valueOf(obj.optString("connectionMode", "LAN"))
+                } catch (_: Exception) { ConnectionMode.LAN }
             )
         }
     }
@@ -139,6 +143,7 @@ class AppPreferences(private val context: Context) {
                 put("name", s.name)
                 put("url", s.url)
                 put("isActive", s.isActive)
+                put("connectionMode", s.connectionMode.name)
             })
         }
         return arr.toString()

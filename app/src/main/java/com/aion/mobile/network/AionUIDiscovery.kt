@@ -5,10 +5,12 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
+import android.os.Build
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
+import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.NetworkInterface
 import java.net.URL
@@ -29,6 +31,25 @@ object AionUIDiscovery {
      * Obtiene la IP local del dispositivo en la red WiFi
      */
     fun getLocalIpAddress(context: Context): String? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            getLocalIpAddressModern(context)
+        } else {
+            getLocalIpAddressLegacy(context)
+        }
+    }
+
+    private fun getLocalIpAddressModern(context: Context): String? {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = cm.activeNetwork ?: return null
+        val lp = cm.getLinkProperties(network) ?: return null
+        val ipv4 = lp.linkAddresses.firstOrNull {
+            it.address is Inet4Address && !it.address.isLoopbackAddress
+        }
+        return ipv4?.address?.hostAddress
+    }
+
+    @Suppress("DEPRECATION")
+    private fun getLocalIpAddressLegacy(context: Context): String? {
         val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
         val wifiInfo: WifiInfo? = wifiManager?.connectionInfo
         val ipInt = wifiInfo?.ipAddress ?: return null
@@ -45,6 +66,23 @@ object AionUIDiscovery {
      * Obtiene la puerta de enlace (gateway) de la red local
      */
     fun getGateway(context: Context): String? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            getGatewayModern(context)
+        } else {
+            getGatewayLegacy(context)
+        }
+    }
+
+    private fun getGatewayModern(context: Context): String? {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = cm.activeNetwork ?: return null
+        val lp = cm.getLinkProperties(network) ?: return null
+        val gateway = lp.routes.firstOrNull { it.hasGateway() }
+        return gateway?.gateway?.hostAddress
+    }
+
+    @Suppress("DEPRECATION")
+    private fun getGatewayLegacy(context: Context): String? {
         val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return null
         val dhcpInfo = wifiManager.dhcpInfo ?: return null
         val gateway = dhcpInfo.gateway
