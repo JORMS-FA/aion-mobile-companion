@@ -65,38 +65,56 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.Splash.route) {
                             SplashScreen(
                                 onNavigateToHome = {
-                                    navController.navigate(Screen.Home.route) {
+                                    val dest = if (servers.isEmpty()) {
+                                        Screen.Connect.route
+                                    } else {
+                                        Screen.Home.route
+                                    }
+                                    navController.navigate(dest) {
                                         popUpTo(Screen.Splash.route) { inclusive = true }
                                     }
                                 }
                             )
                         }
 
+                        composable(Screen.Connect.route) {
+                            ConnectScreen(
+                                appPreferences = appPreferences,
+                                onConnected = {
+                                    navController.navigate(Screen.Home.route) {
+                                        popUpTo(Screen.Connect.route) { inclusive = true }
+                                    }
+                                }
+                            )
+                        }
+
                         composable(Screen.Home.route) {
-                            val servers by appPreferences.servers.collectAsState(initial = emptyList())
+                            val s by appPreferences.servers.collectAsState(initial = emptyList())
+                            val activeId by appPreferences.activeServerId.collectAsState(initial = null)
+                            val currentActive = s.find { it.id == activeId } ?: s.firstOrNull()
 
-                            if (servers.isEmpty()) {
-                                ConnectScreen(
-                                    appPreferences = appPreferences,
-                                    onConnected = {
-                                        navController.navigate(Screen.Home.route) {
-                                            popUpTo(Screen.Home.route) { inclusive = true }
-                                        }
+                            HomeScreen(
+                                serverUrl = currentActive?.url,
+                                serverName = currentActive?.name ?: "",
+                                appPreferences = appPreferences,
+                                onNavigateToSplash = {
+                                    navController.navigate(Screen.Connect.route) {
+                                        popUpTo(Screen.Home.route) { inclusive = false }
                                     }
-                                )
-                            } else {
-                                val activeServer = servers.find { it.id == activeServerId }
-                                    ?: servers.firstOrNull()
-
-                                HomeScreen(
-                                    serverUrl = activeServer?.url,
-                                    serverName = activeServer?.name ?: "",
-                                    appPreferences = appPreferences,
-                                    onNavigateToSplash = {
-                                        navController.navigate(Screen.AddServer.route)
-                                    }
-                                )
-                            }
+                                },
+                                onNavigateToAddServer = {
+                                    navController.navigate(Screen.AddServer.route)
+                                },
+                                onNavigateToSettings = {
+                                    navController.navigate(Screen.Settings.route)
+                                },
+                                onNavigateToServers = {
+                                    navController.navigate(Screen.Servers.route)
+                                },
+                                onNavigateToReminders = {
+                                    navController.navigate(Screen.Reminders.route)
+                                }
+                            )
                         }
 
                         composable(Screen.Servers.route) {
@@ -112,7 +130,9 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.AddServer.route) {
                             AddServerScreen(
                                 appPreferences = appPreferences,
-                                onNavigateBack = { navController.popBackStack() }
+                                onNavigateBack = {
+                                    navController.popBackStack()
+                                }
                             )
                         }
 

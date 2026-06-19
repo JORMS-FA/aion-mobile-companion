@@ -1,6 +1,9 @@
 package com.aion.mobile.ui.screen
 
+import android.app.Activity
+import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -51,13 +54,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.aion.mobile.QRScannerActivity
 import com.aion.mobile.data.model.ConnectionMode
 import com.aion.mobile.data.model.Server
 import com.aion.mobile.data.prefs.AppPreferences
 import com.aion.mobile.network.AionUIDiscovery
 import com.aion.mobile.network.DiscoveredServer
-import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.launch
 
 @Composable
@@ -77,23 +79,25 @@ fun ConnectScreen(
     var connectionMode by remember { mutableStateOf(ConnectionMode.LAN) }
     var showTailscaleHelp by remember { mutableStateOf(false) }
 
-    val scannerLauncher = rememberLauncherForActivityResult(
-        ScanContract()
+    val qrScannerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.contents != null) {
-            val scannedUrl = result.contents.trim()
-            if (scannedUrl.isNotBlank()) {
+        if (result.resultCode == Activity.RESULT_OK) {
+            val scannedUrl = result.data?.getStringExtra("SCAN_RESULT")?.trim()
+            if (!scannedUrl.isNullOrBlank()) {
                 isConnecting = true
                 scope.launch {
-                    appPreferences.addServer(
-                        Server(
-                            name = "Mi PC (QR)",
-                            url = scannedUrl,
-                            connectionMode = connectionMode
-                        )
+                    val server = Server(
+                        name = "Mi PC (QR)",
+                        url = scannedUrl,
+                        connectionMode = connectionMode
                     )
+                    appPreferences.addServer(server)
+                    appPreferences.setActiveServer(server.id)
                     onConnected()
                 }
+            } else {
+                error = "No se pudo leer el código QR"
             }
         }
     }
@@ -158,7 +162,6 @@ fun ConnectScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         if (connectionMode == ConnectionMode.TAILSCALE) {
-            // Tailscale help section
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -210,7 +213,6 @@ fun ConnectScreen(
         }
 
         if (!scanDone && !showManualEntry) {
-            // Search button
             Button(
                 onClick = {
                     isScanning = true
@@ -257,15 +259,10 @@ fun ConnectScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // QR scan button
             FilledTonalButton(
                 onClick = {
-                    val options = ScanOptions()
-                    options.setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                    options.setPrompt("Escanea el código QR de AionUI")
-                    options.setBeepEnabled(false)
-                    options.setOrientationLocked(false)
-                    scannerLauncher.launch(options)
+                    val intent = Intent(context, QRScannerActivity::class.java)
+                    qrScannerLauncher.launch(intent)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -445,13 +442,13 @@ fun ConnectScreen(
                         val url = "http://${ipAddress.trim()}:25808"
                         val works = AionUIDiscovery.checkServer(ipAddress.trim())
                         if (works) {
-                            appPreferences.addServer(
-                                Server(
-                                    name = if (connectionMode == ConnectionMode.TAILSCALE) "Mi PC (Tailscale)" else "Mi PC",
-                                    url = url,
-                                    connectionMode = connectionMode
-                                )
+                            val server = Server(
+                                name = if (connectionMode == ConnectionMode.TAILSCALE) "Mi PC (Tailscale)" else "Mi PC",
+                                url = url,
+                                connectionMode = connectionMode
                             )
+                            appPreferences.addServer(server)
+                            appPreferences.setActiveServer(server.id)
                             onConnected()
                         } else {
                             error = "No se pudo conectar a $url\nVerifica que AionUI esté corriendo"

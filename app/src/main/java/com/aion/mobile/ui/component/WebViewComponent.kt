@@ -8,26 +8,48 @@ import android.net.Uri
 import android.view.View
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceError
 import android.webkit.CookieManager
 import android.webkit.ValueCallback
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.material.ExperimentalMaterialApi
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterialApi::class)
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun WebViewComponent(
@@ -38,8 +60,24 @@ fun WebViewComponent(
 ) {
     var isLoading by remember { mutableStateOf(true) }
     var progress by remember { mutableIntStateOf(0) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    var hasError by remember { mutableStateOf(false) }
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
     var filePathCallback by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
     var filePickerIntent by remember { mutableStateOf<Intent?>(null) }
+    val scope = rememberCoroutineScope()
+
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            webViewRef?.reload()
+            scope.launch {
+                webViewRef?.evaluateJavascript("window.location.reload()", null)
+            }
+            hasError = false
+        }
+    )
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -72,75 +110,145 @@ fun WebViewComponent(
     }
 
     androidx.compose.runtime.key(refreshKey) {
-    Box(modifier = modifier.fillMaxSize()) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { context ->
-                val activity = context as Activity
-                WebView(context).apply {
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
-                    settings.allowFileAccess = true
-                    settings.setSupportMultipleWindows(false)
-                    settings.useWideViewPort = true
-                    settings.loadWithOverviewMode = true
-                    settings.builtInZoomControls = false
-                    settings.displayZoomControls = false
-
-                    CookieManager.getInstance().setAcceptCookie(true)
-                    CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
-
-                    webViewClient = object : WebViewClient() {
-                        override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .pullRefresh(pullRefreshState)
+        ) {
+            if (hasError) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ErrorOutline,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Error al cargar la página",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Verifica la conexión con el servidor",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Button(
+                        onClick = {
+                            hasError = false
                             isLoading = true
-                            onLoadingChanged(true)
+                            webViewRef?.reload()
                         }
-
-                        override fun onPageFinished(view: WebView?, url: String?) {
-                            isLoading = false
-                            onLoadingChanged(false)
-                        }
-
-                        override fun shouldOverrideUrlLoading(
-                            view: WebView?,
-                            request: WebResourceRequest?
-                        ): Boolean {
-                            return false
-                        }
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = null)
+                        Spacer(modifier = Modifier.padding(4.dp))
+                        Text("Reintentar")
                     }
+                }
+            } else {
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { context ->
+                        val activity = context as Activity
+                        WebView(context).apply {
+                            webViewRef = this
 
-                    webChromeClient = object : WebChromeClient() {
-                        override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                            progress = newProgress
-                        }
+                            settings.javaScriptEnabled = true
+                            settings.domStorageEnabled = true
+                            settings.allowFileAccess = true
+                            settings.setSupportMultipleWindows(false)
+                            settings.useWideViewPort = true
+                            settings.loadWithOverviewMode = true
+                            settings.builtInZoomControls = false
+                            settings.displayZoomControls = false
 
-                        override fun onShowFileChooser(
-                            webView: WebView?,
-                            callback: ValueCallback<Array<Uri>>?,
-                            fileChooserParams: FileChooserParams?
-                        ): Boolean {
-                            filePathCallback = callback
-                            filePickerIntent = fileChooserParams?.createIntent()
-                                ?: Intent(Intent.ACTION_GET_CONTENT).apply {
-                                    addCategory(Intent.CATEGORY_OPENABLE)
-                                    type = "*/*"
+                            CookieManager.getInstance().setAcceptCookie(true)
+                            CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+
+                            webViewClient = object : WebViewClient() {
+                                override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                                    isLoading = true
+                                    hasError = false
+                                    onLoadingChanged(true)
                                 }
-                            return true
+
+                                override fun onPageFinished(view: WebView?, url: String?) {
+                                    isLoading = false
+                                    isRefreshing = false
+                                    onLoadingChanged(false)
+                                }
+
+                                override fun onReceivedError(
+                                    view: WebView?,
+                                    request: WebResourceRequest?,
+                                    error: WebResourceError?
+                                ) {
+                                    if (request?.isForMainFrame == true) {
+                                        hasError = true
+                                        isLoading = false
+                                        isRefreshing = false
+                                    }
+                                }
+
+                                override fun shouldOverrideUrlLoading(
+                                    view: WebView?,
+                                    request: WebResourceRequest?
+                                ): Boolean {
+                                    return false
+                                }
+                            }
+
+                            webChromeClient = object : WebChromeClient() {
+                                override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                                    progress = newProgress
+                                }
+
+                                override fun onShowFileChooser(
+                                    webView: WebView?,
+                                    callback: ValueCallback<Array<Uri>>?,
+                                    fileChooserParams: FileChooserParams?
+                                ): Boolean {
+                                    filePathCallback = callback
+                                    filePickerIntent = fileChooserParams?.createIntent()
+                                        ?: Intent(Intent.ACTION_GET_CONTENT).apply {
+                                            addCategory(Intent.CATEGORY_OPENABLE)
+                                            type = "*/*"
+                                        }
+                                    return true
+                                }
+                            }
+
+                            loadUrl(url)
                         }
                     }
+                )
 
-                    loadUrl(url)
+                if (isLoading && progress < 100) {
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.TopCenter),
+                        progress = { progress / 100f },
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
-        )
 
-        if (isLoading && progress < 100) {
-            CircularProgressIndicator(
+            PullRefreshIndicator(
+                refreshing = isRefreshing,
+                state = pullRefreshState,
                 modifier = Modifier.align(Alignment.TopCenter),
-                color = MaterialTheme.colorScheme.primary,
-                progress = { progress / 100f }
+                contentColor = MaterialTheme.colorScheme.primary
             )
         }
-    }
     }
 }

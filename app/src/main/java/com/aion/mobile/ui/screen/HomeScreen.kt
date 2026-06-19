@@ -1,16 +1,10 @@
 package com.aion.mobile.ui.screen
 
-import android.view.WindowManager
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,27 +12,38 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -48,13 +53,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.aion.mobile.data.model.ConnectionMode
 import com.aion.mobile.data.prefs.AppPreferences
 import com.aion.mobile.ui.component.WebViewComponent
@@ -66,91 +67,33 @@ fun HomeScreen(
     serverUrl: String?,
     serverName: String,
     appPreferences: AppPreferences,
-    onNavigateToSplash: () -> Unit
+    onNavigateToSplash: () -> Unit,
+    onNavigateToAddServer: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+    onNavigateToServers: () -> Unit,
+    onNavigateToReminders: () -> Unit
 ) {
     var webViewKey by remember { mutableStateOf(0) }
     var currentUrl by remember { mutableStateOf(serverUrl ?: "") }
-    var showSidebar by remember { mutableStateOf(false) }
+    var showOverflowMenu by remember { mutableStateOf(false) }
+    var showServerSwitcher by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val darkMode by appPreferences.darkMode.collectAsState(initial = false)
     val servers by appPreferences.servers.collectAsState(initial = emptyList())
     val reminders by appPreferences.reminders.collectAsState(initial = emptyList())
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // WebView fullscreen — el núcleo de la app
-        if (currentUrl.isNotEmpty()) {
-            WebViewComponent(
-                refreshKey = webViewKey,
-                url = currentUrl
-            )
-        } else {
-            // Pantalla de bienvenida si no hay servidor
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Default.Home,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Aion Mobile",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Abre el menú y agrega un servidor\npara conectarte a AionUI",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-
-        // Botón flotante hamburger (esquina superior izquierda)
-        IconButton(
-            onClick = { showSidebar = !showSidebar },
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(12.dp)
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.4f))
-        ) {
-            Icon(
-                imageVector = if (showSidebar) Icons.Default.Close else Icons.Default.Menu,
-                contentDescription = "Menú",
-                tint = Color.White,
-                modifier = Modifier.size(24.dp)
-            )
-        }
-
-        // Sidebar tipo ChatGPT
-        AnimatedVisibility(
-            visible = showSidebar,
-            enter = slideInHorizontally(),
-            exit = slideOutHorizontally()
-        ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(300.dp),
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 8.dp
-            ) {
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet(modifier = Modifier.width(300.dp)) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(16.dp)
                         .verticalScroll(rememberScrollState())
                 ) {
-                    // Header
+                    Spacer(modifier = Modifier.height(24.dp))
                     Text(
                         text = "Aion Mobile",
                         style = MaterialTheme.typography.titleLarge,
@@ -160,7 +103,9 @@ fun HomeScreen(
                         Text(
                             text = serverName,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 
@@ -168,7 +113,6 @@ fun HomeScreen(
                     HorizontalDivider()
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Sección: Servidores
                     Text(
                         text = "SERVIDORES",
                         style = MaterialTheme.typography.labelSmall,
@@ -186,61 +130,99 @@ fun HomeScreen(
                         )
                     } else {
                         servers.forEach { server ->
-                            SidebarItem(
-                                icon = Icons.Default.Dns,
-                                label = server.name,
-                                badge = if (server.connectionMode == ConnectionMode.TAILSCALE) "TS" else "LAN",
-                                isActive = server.url == currentUrl,
+                            NavigationDrawerItem(
+                                icon = {
+                                    Icon(
+                                        Icons.Default.Dns,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                },
+                                label = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(server.name, modifier = Modifier.weight(1f))
+                                        if (server.connectionMode == ConnectionMode.TAILSCALE) {
+                                            Text(
+                                                text = "TS",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                },
+                                selected = server.url == currentUrl,
                                 onClick = {
                                     currentUrl = server.url
                                     webViewKey++
-                                    showSidebar = false
+                                    scope.launch { drawerState.close() }
                                 },
-                                onDelete = {
-                                    scope.launch {
-                                        appPreferences.removeServer(server.id)
-                                    }
-                                }
+                                modifier = Modifier.padding(vertical = 2.dp),
+                                colors = NavigationDrawerItemDefaults.colors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
                             )
                         }
                     }
 
-                    // Botón agregar servidor
-                    SidebarItem(
-                        icon = Icons.Default.Add,
-                        label = "Agregar servidor",
-                        isActive = false,
+                    Spacer(modifier = Modifier.height(8.dp))
+                    NavigationDrawerItem(
+                        icon = {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        label = { Text("Agregar servidor") },
+                        selected = false,
                         onClick = {
-                            showSidebar = false
-                            onNavigateToSplash()
-                        }
+                            scope.launch { drawerState.close() }
+                            onNavigateToAddServer()
+                        },
+                        modifier = Modifier.padding(vertical = 2.dp)
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
                     HorizontalDivider()
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Recordatorios
                     Text(
-                        text = "RECORDATORIOS",
+                        text = "NAVEGACIÓN",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    SidebarItem(
-                        icon = Icons.Default.Notifications,
-                        label = "${reminders.size} recordatorio${if (reminders.size != 1) "s" else ""}",
-                        isActive = false,
-                        onClick = { showSidebar = false }
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Dns, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        label = { Text("Servidores") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onNavigateToServers()
+                        },
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        label = { Text("Recordatorios (${reminders.size})") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onNavigateToReminders()
+                        },
+                        modifier = Modifier.padding(vertical = 2.dp)
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
                     HorizontalDivider()
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Modo oscuro
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -248,7 +230,7 @@ fun HomeScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = Icons.Default.DarkMode,
+                            Icons.Default.DarkMode,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurface
                         )
@@ -266,22 +248,7 @@ fun HomeScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Recargar WebView
-                    SidebarItem(
-                        icon = Icons.Default.Refresh,
-                        label = "Recargar página",
-                        isActive = false,
-                        onClick = {
-                            webViewKey++
-                            showSidebar = false
-                        }
-                    )
-
                     Spacer(modifier = Modifier.weight(1f))
-
-                    // Footer: versión
                     HorizontalDivider()
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -292,68 +259,134 @@ fun HomeScreen(
                 }
             }
         }
-
-        // Overlay oscuro al abrir sidebar
-        if (showSidebar) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable { showSidebar = false }
-                    .background(Color.Black.copy(alpha = 0.3f))
-            )
-        }
-    }
-}
-
-@Composable
-private fun SidebarItem(
-    icon: ImageVector,
-    label: String,
-    badge: String? = null,
-    isActive: Boolean,
-    onClick: () -> Unit,
-    onDelete: (() -> Unit)? = null
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .then(
-                if (isActive)
-                    Modifier.background(MaterialTheme.colorScheme.primaryContainer)
-                else Modifier
-            )
-            .clickable(onClick = onClick)
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            tint = if (isActive)
-                MaterialTheme.colorScheme.onPrimaryContainer
-            else
-                MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (isActive)
-                MaterialTheme.colorScheme.onPrimaryContainer
-            else
-                MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
-        )
-        if (badge != null) {
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = badge,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.Bold
-            )
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Row(
+                            modifier = Modifier.clickable { showServerSwitcher = !showServerSwitcher },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Home,
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp),
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = serverName.ifEmpty { "Aion Mobile" },
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(
+                                Icons.Default.Menu,
+                                contentDescription = "Abrir menú"
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { webViewKey++ }) {
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = "Recargar página"
+                            )
+                        }
+                        Box {
+                            IconButton(onClick = { showOverflowMenu = true }) {
+                                Icon(
+                                    Icons.Default.MoreVert,
+                                    contentDescription = "Más opciones"
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showOverflowMenu,
+                                onDismissRequest = { showOverflowMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Servidores") },
+                                    leadingIcon = { Icon(Icons.Default.Dns, contentDescription = null) },
+                                    onClick = {
+                                        showOverflowMenu = false
+                                        onNavigateToServers()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Recordatorios") },
+                                    leadingIcon = { Icon(Icons.Default.Notifications, contentDescription = null) },
+                                    onClick = {
+                                        showOverflowMenu = false
+                                        onNavigateToReminders()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Ajustes") },
+                                    leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                                    onClick = {
+                                        showOverflowMenu = false
+                                        onNavigateToSettings()
+                                    }
+                                )
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text(if (darkMode) "Modo claro" else "Modo oscuro") },
+                                    leadingIcon = { Icon(Icons.Default.DarkMode, contentDescription = null) },
+                                    onClick = {
+                                        showOverflowMenu = false
+                                        scope.launch { appPreferences.setDarkMode(!darkMode) }
+                                    }
+                                )
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+            }
+        ) { paddingValues ->
+            if (currentUrl.isNotEmpty()) {
+                WebViewComponent(
+                    refreshKey = webViewKey,
+                    url = currentUrl,
+                    modifier = Modifier.padding(paddingValues)
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.Home,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Aion Mobile",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Abre el menú y agrega un servidor\npara conectarte a AionUI",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
         }
     }
 }

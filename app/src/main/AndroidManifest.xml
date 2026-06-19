@@ -37,5 +37,11 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".QRScannerActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
     </application>
 </manifest>

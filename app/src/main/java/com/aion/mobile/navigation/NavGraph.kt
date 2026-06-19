@@ -2,6 +2,7 @@ package com.aion.mobile.navigation
 
 sealed class Screen(val route: String) {
     data object Splash : Screen("splash")
+    data object Connect : Screen("connect")
     data object Home : Screen("home")
     data object Servers : Screen("servers")
     data object AddServer : Screen("add_server")
