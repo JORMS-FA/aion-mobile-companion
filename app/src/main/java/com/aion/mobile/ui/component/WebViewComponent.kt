@@ -7,6 +7,8 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.view.View
+import android.util.Log
+import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -186,6 +188,9 @@ fun WebViewComponent(
                                 cacheMode = WebSettings.LOAD_DEFAULT
                                 mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
 
+                                textZoom = 100
+                                defaultTextEncodingName = "UTF-8"
+
                                 val chromeUA = "Mozilla/5.0 (Linux; Android ${Build.VERSION.RELEASE}; ${Build.MODEL}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36"
                                 userAgentString = chromeUA
                             }
@@ -222,11 +227,21 @@ fun WebViewComponent(
                                     view: WebView?,
                                     request: WebResourceRequest?
                                 ): Boolean {
+                                    val url = request?.url?.toString() ?: return false
+                                    if (url.contains("100.95.4.70:25808") || url.contains("192.168.") || url.contains("10.0.")) {
+                                        view?.loadUrl(url)
+                                        return true
+                                    }
                                     return false
                                 }
                             }
 
                             webChromeClient = object : WebChromeClient() {
+                                override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
+                                    Log.d("AionWebView", "[${consoleMessage.messageLevel()}] ${consoleMessage.message()} (${consoleMessage.sourceId()}:${consoleMessage.lineNumber()})")
+                                    return true
+                                }
+
                                 override fun onProgressChanged(view: WebView?, newProgress: Int) {
                                     progress = newProgress
                                 }
