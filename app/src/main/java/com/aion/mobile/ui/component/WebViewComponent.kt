@@ -5,18 +5,20 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
-import android.os.Build
-import android.view.View
 import android.util.Log
+import android.view.View
 import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
+import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +29,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Refresh
@@ -45,12 +48,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.material.ExperimentalMaterialApi
+import com.aion.mobile.BuildConfig
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterialApi::class)
@@ -162,14 +164,16 @@ fun WebViewComponent(
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { context ->
-                        val activity = context as Activity
                         WebView(context).apply {
                             webViewRef = this
 
                             setLayerType(View.LAYER_TYPE_HARDWARE, null)
+                            setDrawingCacheEnabled(true)
 
                             with(settings) {
                                 javaScriptEnabled = true
+                                javaScriptCanOpenWindowsAutomatically = true
+                                mediaPlaybackRequiresUserGesture = false
                                 domStorageEnabled = true
                                 databaseEnabled = true
                                 allowFileAccess = true
@@ -179,20 +183,18 @@ fun WebViewComponent(
                                 setSupportMultipleWindows(false)
                                 useWideViewPort = true
                                 loadWithOverviewMode = true
+                                layoutAlgorithm = WebSettings.LayoutAlgorithm.TEXT_AUTOSIZING
+                                setSupportZoom(true)
                                 builtInZoomControls = true
                                 displayZoomControls = false
-                                setSupportZoom(true)
-                                layoutAlgorithm = WebSettings.LayoutAlgorithm.TEXT_AUTOSIZING
-                                javaScriptCanOpenWindowsAutomatically = true
-                                mediaPlaybackRequiresUserGesture = false
                                 cacheMode = WebSettings.LOAD_DEFAULT
                                 mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-
                                 textZoom = 100
                                 defaultTextEncodingName = "UTF-8"
+                                defaultFontSize = 16
+                                minimumFontSize = 12
 
-                                val chromeUA = "Mozilla/5.0 (Linux; Android ${Build.VERSION.RELEASE}; ${Build.MODEL}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36"
-                                userAgentString = chromeUA
+                                userAgentString = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                             }
 
                             CookieManager.getInstance().setAcceptCookie(true)
@@ -203,12 +205,28 @@ fun WebViewComponent(
                                     isLoading = true
                                     hasError = false
                                     onLoadingChanged(true)
+                                    Log.d("AionWebView", "Page started: $url")
                                 }
 
                                 override fun onPageFinished(view: WebView?, url: String?) {
                                     isLoading = false
                                     isRefreshing = false
                                     onLoadingChanged(false)
+                                    view?.evaluateJavascript("""
+                                        (function() {
+                                            var meta = document.querySelector('meta[name=viewport]');
+                                            if (!meta) {
+                                                meta = document.createElement('meta');
+                                                meta.name = 'viewport';
+                                                meta.content = 'width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover';
+                                                document.head.appendChild(meta);
+                                            }
+                                            var style = document.createElement('style');
+                                            style.textContent = '@supports (-webkit-touch-callout: none) { html, body { height: -webkit-fill-available; } body { min-height: -webkit-fill-available; } }';
+                                            document.head.appendChild(style);
+                                        })();
+                                    """.trimIndent(), null)
+                                    Log.d("AionWebView", "Page finished: $url")
                                 }
 
                                 override fun onReceivedError(
@@ -221,6 +239,15 @@ fun WebViewComponent(
                                         isLoading = false
                                         isRefreshing = false
                                     }
+                                    Log.e("AionWebView", "onReceivedError: ${error?.description} (code: ${error?.errorCode}) url: ${request?.url}")
+                                }
+
+                                override fun onReceivedHttpError(
+                                    view: WebView?,
+                                    request: WebResourceRequest?,
+                                    errorResponse: WebResourceResponse?
+                                ) {
+                                    Log.w("AionWebView", "HTTP Error: ${errorResponse?.statusCode} ${errorResponse?.reasonPhrase} url: ${request?.url}")
                                 }
 
                                 override fun shouldOverrideUrlLoading(
@@ -228,7 +255,7 @@ fun WebViewComponent(
                                     request: WebResourceRequest?
                                 ): Boolean {
                                     val url = request?.url?.toString() ?: return false
-                                    if (url.contains("100.95.4.70:25808") || url.contains("192.168.") || url.contains("10.0.")) {
+                                    if (url.startsWith("http://") || url.startsWith("https://")) {
                                         view?.loadUrl(url)
                                         return true
                                     }
@@ -238,8 +265,19 @@ fun WebViewComponent(
 
                             webChromeClient = object : WebChromeClient() {
                                 override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
-                                    Log.d("AionWebView", "[${consoleMessage.messageLevel()}] ${consoleMessage.message()} (${consoleMessage.sourceId()}:${consoleMessage.lineNumber()})")
+                                    val level = when (consoleMessage.messageLevel()) {
+                                        ConsoleMessage.MessageLevel.ERROR -> "ERROR"
+                                        ConsoleMessage.MessageLevel.WARNING -> "WARN"
+                                        ConsoleMessage.MessageLevel.DEBUG -> "DEBUG"
+                                        ConsoleMessage.MessageLevel.LOG -> "LOG"
+                                        else -> "UNKNOWN"
+                                    }
+                                    Log.d("AionWebView", "[$level] ${consoleMessage.message()} (${consoleMessage.sourceId()}:${consoleMessage.lineNumber()})")
                                     return true
+                                }
+
+                                override fun onPermissionRequest(request: PermissionRequest?) {
+                                    request?.grant(request?.resources)
                                 }
 
                                 override fun onProgressChanged(view: WebView?, newProgress: Int) {
@@ -259,6 +297,10 @@ fun WebViewComponent(
                                         }
                                     return true
                                 }
+                            }
+
+                            if (BuildConfig.DEBUG) {
+                                WebView.setWebContentsDebuggingEnabled(true)
                             }
 
                             loadUrl(url)
