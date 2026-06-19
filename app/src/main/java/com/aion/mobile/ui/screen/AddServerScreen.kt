@@ -1,9 +1,13 @@
 package com.aion.mobile.ui.screen
 
+import android.Manifest
 import android.app.Activity
+import android.content.Intent
+import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -85,6 +89,15 @@ fun AddServerScreen(
         }
     }
 
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            val intent = Intent(context, QRScannerActivity::class.java)
+            qrScannerLauncher.launch(intent)
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -156,8 +169,12 @@ fun AddServerScreen(
 
             FilledTonalButton(
                 onClick = {
-                    val intent = android.content.Intent(context, QRScannerActivity::class.java)
-                    qrScannerLauncher.launch(intent)
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                        val intent = Intent(context, QRScannerActivity::class.java)
+                        qrScannerLauncher.launch(intent)
+                    } else {
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)

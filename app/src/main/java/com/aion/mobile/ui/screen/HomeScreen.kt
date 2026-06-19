@@ -24,6 +24,8 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -72,7 +74,9 @@ fun HomeScreen(
     onNavigateToAddServer: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToServers: () -> Unit,
-    onNavigateToReminders: () -> Unit
+    onNavigateToReminders: () -> Unit,
+    onViewTutorial: () -> Unit = {},
+    onResetApp: () -> Unit = {}
 ) {
     var webViewKey by remember { mutableStateOf(0) }
     var currentUrl by remember { mutableStateOf(serverUrl ?: "") }
@@ -248,6 +252,40 @@ fun HomeScreen(
                             }
                         )
                     }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "APLICACIÓN",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.School, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        label = { Text("Ver tutorial") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onViewTutorial()
+                        },
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        label = { Text("Reiniciar app") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onResetApp()
+                        },
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
 
                     Spacer(modifier = Modifier.weight(1f))
                     HorizontalDivider()

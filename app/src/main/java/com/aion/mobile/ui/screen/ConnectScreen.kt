@@ -1,10 +1,13 @@
 package com.aion.mobile.ui.screen
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -102,6 +105,17 @@ fun ConnectScreen(
         }
     }
 
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            val intent = Intent(context, QRScannerActivity::class.java)
+            qrScannerLauncher.launch(intent)
+        } else {
+            error = "Permiso de cámara requerido para escanear QR"
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -145,7 +159,7 @@ fun ConnectScreen(
                 shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
             ) {
                 Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(6.dp))
                 Text("LAN")
             }
             SegmentedButton(
@@ -154,7 +168,7 @@ fun ConnectScreen(
                 shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
             ) {
                 Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(6.dp))
                 Text("Tailscale")
             }
         }
@@ -261,8 +275,12 @@ fun ConnectScreen(
 
             FilledTonalButton(
                 onClick = {
-                    val intent = Intent(context, QRScannerActivity::class.java)
-                    qrScannerLauncher.launch(intent)
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                        val intent = Intent(context, QRScannerActivity::class.java)
+                        qrScannerLauncher.launch(intent)
+                    } else {
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
                 },
                 modifier = Modifier
                     .fillMaxWidth()

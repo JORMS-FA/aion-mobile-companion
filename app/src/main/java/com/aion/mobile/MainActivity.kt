@@ -12,12 +12,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.aion.mobile.data.prefs.AppPreferences
+import kotlinx.coroutines.launch
 import com.aion.mobile.navigation.Screen
 import com.aion.mobile.ui.screen.AddReminderScreen
 import com.aion.mobile.ui.screen.AddServerScreen
@@ -116,6 +118,7 @@ class MainActivity : ComponentActivity() {
                             val s by appPreferences.servers.collectAsState(initial = emptyList())
                             val activeId by appPreferences.activeServerId.collectAsState(initial = null)
                             val currentActive = s.find { it.id == activeId } ?: s.firstOrNull()
+                            val homeScope = rememberCoroutineScope()
 
                             HomeScreen(
                                 serverUrl = currentActive?.url,
@@ -137,6 +140,18 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onNavigateToReminders = {
                                     navController.navigate(Screen.Reminders.route)
+                                },
+                                onViewTutorial = {
+                                    homeScope.launch { appPreferences.setHasSeenWelcome(false) }
+                                    navController.navigate(Screen.Welcome.route) {
+                                        popUpTo(Screen.Home.route) { inclusive = false }
+                                    }
+                                },
+                                onResetApp = {
+                                    homeScope.launch { appPreferences.resetToWelcome() }
+                                    navController.navigate(Screen.Welcome.route) {
+                                        popUpTo(0) { inclusive = true }
+                                    }
                                 }
                             )
                         }

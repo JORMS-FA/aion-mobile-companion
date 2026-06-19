@@ -103,6 +103,14 @@ class AppPreferences(private val context: Context) {
         }
     }
 
+    suspend fun resetToWelcome() {
+        saveServers(emptyList())
+        context.dataStore.edit { prefs ->
+            prefs.remove(ACTIVE_SERVER_ID)
+            prefs[HAS_SEEN_WELCOME] = false
+        }
+    }
+
     suspend fun saveReminders(reminders: List<Reminder>) {
         context.dataStore.edit { prefs ->
             prefs[REMINDERS_JSON] = remindersToJson(reminders)
