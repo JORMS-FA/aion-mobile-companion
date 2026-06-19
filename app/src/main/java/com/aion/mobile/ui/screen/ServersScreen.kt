@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -115,11 +116,11 @@ fun ServersScreen(
                     SwipeToDismissBox(
                         state = dismissState,
                         backgroundContent = {
-                            // Fondo rojo con ícono de eliminar
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .background(Color(0xFFE53935))
+                                    .padding(vertical = 8.dp)
+                                    .background(Color(0xFFE53935), RoundedCornerShape(12.dp))
                                     .padding(horizontal = 20.dp),
                                 contentAlignment = Alignment.CenterEnd
                             ) {

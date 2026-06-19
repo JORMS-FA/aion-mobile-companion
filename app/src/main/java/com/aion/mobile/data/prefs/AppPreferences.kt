@@ -23,6 +23,7 @@ class AppPreferences(private val context: Context) {
         private val SERVERS_JSON = stringPreferencesKey("servers_json")
         private val ACTIVE_SERVER_ID = stringPreferencesKey("active_server_id")
         private val REMINDERS_JSON = stringPreferencesKey("reminders_json")
+        private val HAS_SEEN_WELCOME = booleanPreferencesKey("has_seen_welcome")
     }
 
     val darkMode: Flow<Boolean> = context.dataStore.data.map { prefs ->
@@ -36,6 +37,10 @@ class AppPreferences(private val context: Context) {
 
     val activeServerId: Flow<String?> = context.dataStore.data.map { prefs ->
         prefs[ACTIVE_SERVER_ID]
+    }
+
+    val hasSeenWelcome: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[HAS_SEEN_WELCOME] ?: false
     }
 
     val reminders: Flow<List<Reminder>> = context.dataStore.data.map { prefs ->
@@ -89,6 +94,12 @@ class AppPreferences(private val context: Context) {
     suspend fun clearSession() {
         context.dataStore.edit { prefs ->
             prefs.remove(ACTIVE_SERVER_ID)
+        }
+    }
+
+    suspend fun setHasSeenWelcome(seen: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[HAS_SEEN_WELCOME] = seen
         }
     }
 

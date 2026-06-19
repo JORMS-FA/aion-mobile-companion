@@ -20,13 +20,14 @@ import androidx.navigation.compose.rememberNavController
 import com.aion.mobile.data.prefs.AppPreferences
 import com.aion.mobile.navigation.Screen
 import com.aion.mobile.ui.screen.AddReminderScreen
-import com.aion.mobile.ui.screen.ConnectScreen
 import com.aion.mobile.ui.screen.AddServerScreen
+import com.aion.mobile.ui.screen.ConnectScreen
 import com.aion.mobile.ui.screen.HomeScreen
 import com.aion.mobile.ui.screen.RemindersScreen
 import com.aion.mobile.ui.screen.ServersScreen
 import com.aion.mobile.ui.screen.SettingsScreen
 import com.aion.mobile.ui.screen.SplashScreen
+import com.aion.mobile.ui.screen.WelcomeScreen
 import com.aion.mobile.ui.theme.AionMobileTheme
 
 class MainActivity : ComponentActivity() {
@@ -63,15 +64,38 @@ class MainActivity : ComponentActivity() {
                         startDestination = Screen.Splash.route
                     ) {
                         composable(Screen.Splash.route) {
+                            val hasSeenWelcome by appPreferences.hasSeenWelcome.collectAsState(initial = false)
                             SplashScreen(
                                 onNavigateToHome = {
+                                    if (!hasSeenWelcome) {
+                                        navController.navigate(Screen.Welcome.route) {
+                                            popUpTo(Screen.Splash.route) { inclusive = true }
+                                        }
+                                    } else {
+                                        val dest = if (servers.isEmpty()) {
+                                            Screen.Connect.route
+                                        } else {
+                                            Screen.Home.route
+                                        }
+                                        navController.navigate(dest) {
+                                            popUpTo(Screen.Splash.route) { inclusive = true }
+                                        }
+                                    }
+                                }
+                            )
+                        }
+
+                        composable(Screen.Welcome.route) {
+                            WelcomeScreen(
+                                appPreferences = appPreferences,
+                                onContinue = {
                                     val dest = if (servers.isEmpty()) {
                                         Screen.Connect.route
                                     } else {
                                         Screen.Home.route
                                     }
                                     navController.navigate(dest) {
-                                        popUpTo(Screen.Splash.route) { inclusive = true }
+                                        popUpTo(Screen.Welcome.route) { inclusive = true }
                                     }
                                 }
                             )

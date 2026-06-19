@@ -56,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.aion.mobile.BuildConfig
 import com.aion.mobile.data.model.ConnectionMode
 import com.aion.mobile.data.prefs.AppPreferences
 import com.aion.mobile.ui.component.WebViewComponent
@@ -252,7 +253,7 @@ fun HomeScreen(
                     HorizontalDivider()
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "v1.0.0",
+                        text = "v${BuildConfig.VERSION_NAME}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
