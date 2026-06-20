@@ -23,6 +23,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -40,7 +41,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -72,6 +75,7 @@ fun WebViewComponent(
     var filePathCallback by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
     var filePickerIntent by remember { mutableStateOf<Intent?>(null) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     val pullRefreshState = rememberPullRefreshState(
         refreshing = isRefreshing,
@@ -143,21 +147,37 @@ fun WebViewComponent(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Verifica la conexión con el servidor",
+                        text = "Abre en Chrome o verifica la conexión",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = url,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Spacer(modifier = Modifier.height(24.dp))
-                    Button(
-                        onClick = {
-                            hasError = false
-                            isLoading = true
-                            webViewRef?.reload()
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(
+                            onClick = {
+                                hasError = false
+                                isLoading = true
+                                webViewRef?.reload()
+                            }
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Spacer(modifier = Modifier.padding(4.dp))
+                            Text("Reintentar")
                         }
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null)
-                        Spacer(modifier = Modifier.padding(4.dp))
-                        Text("Reintentar")
+                        OutlinedButton(
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                context.startActivity(intent)
+                            }
+                        ) {
+                            Text("Abrir en Chrome")
+                        }
                     }
                 }
             } else {
